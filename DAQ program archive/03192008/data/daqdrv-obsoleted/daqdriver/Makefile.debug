@@ -1,0 +1,17 @@
+
+DEBUGFLAGS = -O -g -DDAQDRV_DEBUG
+CFLAGS += $(DEBUGFLAGS)
+
+obj-m := daqdrv.o
+
+daqdrv-objs := daqdrvmain.o gsc16aiss8ao4.o
+
+KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+PWD       := $(shell pwd)
+
+default:
+	$(MAKE) -C $(KERNELDIR) M=$(PWD)
+
+
+clean:
+	rm $(daqdrv-objs)

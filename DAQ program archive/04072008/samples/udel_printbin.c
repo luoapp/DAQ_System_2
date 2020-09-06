@@ -1,0 +1,92 @@
+
+#include "daqutil.h"
+#include "daqio.h"
+#include "daqregs.h"
+#include "daqprint.h"
+#include "daqparse.h"
+#include "gsclib.h"
+#include "udel_daq.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+int main(int argc, char **argv)
+{
+  unsigned short buff[UDELdaqblocksize];
+  UDELdaqheader fileheader, filefin;
+
+  char daqfilename[128]="/data/sata1/test.daq";
+
+  if (argc > 1)
+  {
+    int ix;
+    for ( ix = 1; ix < argc; ix++)
+    {
+      if ( strstr	( argv[ix], ".daq" ) != NULL )
+      {
+        //printf( "%s\n", argv[ix] );
+        sprintf( daqfilename, "/data/sata1/%s",argv[ix] );
+        continue;
+      }
+    }
+  }
+  
+  FILE * pdaqfile;
+  pdaqfile = fopen(daqfilename,"rb+");
+  if (pdaqfile == NULL ) 
+  {
+    printf("daq file open error!\n");
+    exit(1);
+  }
+  fread( &fileheader, sizeof( UDELdaqheader ), 1, pdaqfile );
+  
+  //printf("%s\n%s\n", argv[1], argv[2] );
+  if (argc > 1)
+  {
+    int ix;
+    for ( ix = 1; ix < argc; ix++)
+    {
+      if ( strstr( argv[ix], "-v" ) != NULL)
+      {
+        int ix1, ix3;
+		  //char ix2[2];
+        ix3 = fseek( pdaqfile, -sizeof( UDELdaqheader ), SEEK_END );
+        ix1 = fread( &filefin, 1, sizeof( UDELdaqheader ), pdaqfile );
+        //ix1 = fread( ix2, sizeof( char ), 2, pdaqfile);
+        fseek( pdaqfile, sizeof( UDELdaqheader ), SEEK_SET );	
+        printf( "recording start time(UTC) = %s \n", fileheader.UTCtime );
+        printf( "recording stop  time(UTC) = %s \n", filefin.UTCtime );
+        if (strlen( argv[ix] ) == 3)
+        {
+          udelprintinfo( &fileheader.board.ctl );
+          udelprintstatus( &fileheader.board.status );
+          udelprintinfo( &filefin.board.ctl );
+          udelprintstatus( &filefin.board.status );
+        }
+        else
+        {
+          daqCtlPrint(stdout, &fileheader.board.ctl );
+          daqStatusPrint( stdout, &fileheader.board.status );
+          daqCtlPrint(stdout, &filefin.board.ctl );
+          daqStatusPrint( stdout, &filefin.board.status );
+        }
+        continue;
+      }
+    }
+    
+  }
+
+  fread(buff, sizeof(unsigned short), UDELdaqblocksize, pdaqfile);
+  //printRawFlt( stdout, buff, NDATA, fileheader.ctl.ictl.nchans,	fileheader.ctl.ictl.vfs        );
+  
+  printf("%X %X %X\n", (int )buff[0], (int) buff[1], (int) buff[2]);
+  
+  float r1=(float) (( (int)(buff[0] & 0x0000ffff) - 32768.0)) / 32768.0 * fileheader.board.ctl.ictl.vfs ;
+  //gscRawtoFloat( rdata, buff, UDELdaqblocksize, fileheader.board.ctl.ictl.vfs );
+  printf( "%f\n", r1);
+  fclose( pdaqfile );
+
+  exit(0);
+
+}

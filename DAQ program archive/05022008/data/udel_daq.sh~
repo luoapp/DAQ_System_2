@@ -1,0 +1,4 @@
+#echo "udel daq started ... "
+/data/beep/beep -r20 -d1000 -f800 -l100 &
+echo "/data/daqdrv64/samples/udel_readonly i.length=3600 x.disp=0 x.hd=1" | at now+2min
+

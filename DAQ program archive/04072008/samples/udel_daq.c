@@ -1,0 +1,213 @@
+
+#include "daqutil.h"
+#include "daqio.h"
+#include "daqregs.h"
+#include "daqprint.h"
+#include "gsclib.h"
+#include "udel_daq.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <X11/Xlib.h>
+#include <unistd.h>	
+#include <sys/time.h>
+
+extern float xwin_buffer1[ xwin_bufferlen ], xwin_buffer2[ xwin_bufferlen ];
+extern float xwin_pd, xwin_fs, xwin_fps;
+extern Display* display;	
+extern Window win;			
+extern GC gc;			
+extern XColor red, brown, blue, yellow, green, white, black;
+//========================================
+
+
+//========================================
+
+void udeltime( char * p )
+{
+  time_t rawtime;
+  time ( &rawtime );
+  //printf( "UTC time=%s\n", asctime( gmtime( &rawtime ) ) );
+  sprintf( p, "UTC=%s\n", asctime( gmtime( &rawtime ) ) );
+}
+
+//=========================================
+FILE * udeldaqfileinit( DaqBoard * pboard, unsigned int bx1 )
+{
+  DaqBoard board;
+  board = *pboard;
+  UDELdaqheader fileheader = { { 0 } };  
+  strcpy(fileheader.udel_sig, UDELsignature);
+    
+  struct tm * ptm;
+  time_t rawtime;
+//  time ( &rawtime );
+//  ptm = gmtime ( &rawtime );
+  char daqfilename[256];
+
+  struct timeval tv;
+  gettimeofday(&tv, NULL); 
+  rawtime=tv.tv_sec;
+  ptm = gmtime ( &rawtime );
+
+
+  sprintf ( fileheader.UTCtime,"%04d%02d%02dT%02d%02d%02d",
+    ( ptm -> tm_year + 1900 ), ptm -> tm_mon+1, ptm -> tm_mday,
+    ptm -> tm_hour, ptm -> tm_min, ptm -> tm_sec );
+
+  sprintf ( daqfilename,"/data/sata1/%s.daq", fileheader.UTCtime );
+  printf( "%s\n", daqfilename);
+
+  sprintf ( fileheader.UTCtime,"%04d%02d%02dT%02d%02d%02d.%ldGMT",
+    ( ptm -> tm_year + 1900 ), ptm -> tm_mon+1, ptm -> tm_mday,
+    ptm -> tm_hour, ptm -> tm_min, ptm -> tm_sec, tv.tv_usec );
+  //printf( "%s\n", fileheader.UTCtime);
+  
+
+  //printf( "fileheader time = %s\n", fileheader.UTCtime );
+  fileheader.board = board;
+  fileheader.sample_per_block = UDELdaqblocksize;
+  fileheader.block_requested = bx1;
+  //strcpy( daqfilename, "/data/sata1/test.daq" );
+
+  FILE * pdaqfile;
+  pdaqfile = fopen(daqfilename,"wb+");
+  
+  fwrite( &fileheader, 1, sizeof( UDELdaqheader ), pdaqfile );
+  //fclose( pdaqfile );
+  return pdaqfile;
+}
+
+//=================================================
+int udeldaqfileclose( FILE * pdaqfile, DaqBoard * pboard )
+{
+  DaqBoard board = *pboard;
+  UDELdaqheader fileheader = { { 0 } };  
+  strcpy(fileheader.udel_sig, UDELsignature);
+    
+  struct tm * ptm;
+  time_t rawtime;
+  time ( &rawtime );
+  ptm = gmtime ( &rawtime );
+  sprintf ( fileheader.UTCtime,"%04d%02d%02dT%02d%02d%02d",
+    ( ptm -> tm_year + 1900 ), ptm -> tm_mon+1, ptm -> tm_mday,
+    ptm -> tm_hour, ptm -> tm_min, ptm -> tm_sec );
+  //printf( "%s\n", daqfilename);
+
+/*  sprintf ( fileheader.UTCtime,"%04d%02d%02dT%02d%02d%02d",
+    ( ptm -> tm_year + 1900 ), ptm -> tm_mon+1, ptm -> tm_mday,
+    ptm -> tm_hour, ptm -> tm_min, ptm -> tm_sec );
+*/
+  fileheader.board = board;
+
+  fwrite( &fileheader, 1, sizeof( UDELdaqheader ), pdaqfile );
+
+  int fs = fclose( pdaqfile );
+  
+  return 0;
+}
+//=================================================
+
+void udelprintinfo ( DAQDRV_Ctl	*pctl )
+{
+  DAQDRV_Ctl ctl = *pctl;
+  printf( "\n=====Daq board info=====\n");
+  printf( "daq board firmware version: %d\nAnalog input channel: %d \nAualog output channel: %d \n", ctl.cfg.version, ctl.cfg.inchans, ctl.cfg.outchans );
+  printf( "Master clock rate: %fHz\n", ctl.cfg.clock);
+ 
+  DaqAioCtl ioctl = ctl.ictl;
+  
+  printf( "\n \n=====Analog input controls=====\n");
+  printf( "Volts full scale: %fv\nSample rate/channel: %fHz \nclock divider: %d\n", ioctl.vfs, ioctl.clockrate, ioctl.ndiv );
+  printf( "clockmaster: ");
+  if ( ioctl.clkmaster == 1 ) printf( "internal clock" );
+    else printf( "external clock" );
+  printf( "\ninput mode: ");
+  switch ( ioctl.nmode )
+  {
+    case 1:
+      printf( "single ended (%d)\n",ioctl.nmode);
+      break;
+    case 0:
+      printf( "differential (%d)\n",ioctl.nmode);
+      break;
+    default:
+      printf( "Others (%d)\n",ioctl.nmode);
+  }
+
+  printf( "input range: ");
+ 
+  switch ( ioctl.nrange )
+  {
+    case 0:
+      printf( "2.5v\n");
+      break;
+    case 1:
+      printf( "5v\n");
+      break;
+    case 2:
+      printf( "10v\n");
+      break;
+    default:
+      printf( "unknown (%d)\n",ioctl.nrange);
+  }
+  
+  if ( ioctl.nburst == 0 ) 
+  {
+     printf( "Continuous mode\n");
+     printf( "  number of active channels: %d\n", ioctl.nchans );
+     printf( "  fifo threshold level: %d\n", ioctl.nthreshold );
+  }
+  else
+  {
+     printf( "Burst mode\n");
+     printf( "  number of active channels: %d\nburst length (samples/channel): %d\n", ioctl.nchans, ioctl.nburst);
+     printf( "  fifo threshold level: %d\ndata requirement ( nchans * nburst ):%d\n",ioctl.nthreshold, ioctl.ndata);
+  }
+
+
+  ioctl = ctl.octl;
+  
+  printf( "\n \n=====Analog output controls=====\n");
+  printf( "Volts full scale: %fv\nSample rate/channel: %fHz \nclock divider: %d\n", ioctl.vfs, ioctl.clockrate, ioctl.ndiv );
+  printf( "clockmaster: ");
+  if ( ioctl.clkmaster == 1 ) printf( "internal clock" );
+    else printf( "external clock" );
+  
+  if ( ioctl.nburst == 0 ) 
+  {
+     printf( "\nContinuous mode\n");
+     printf( "  number of active channels: %d\n", ioctl.nchans );
+     printf( "  fifo threshold level: %d\n", ioctl.nthreshold );
+  }
+  else
+  {
+     printf( "Burst mode\n");
+     printf( "  number of active channels: %d\nburst length (samples/channel): %d\n", ioctl.nchans, ioctl.nburst);
+     printf( "  fifo threshold level: %d\ndata requirement ( nchans * nburst ):%d\n",ioctl.nthreshold, ioctl.ndata);
+  }
+
+  printf("\n\n");
+}
+
+
+//===========================================================
+
+void udelprintstatus ( DAQDRV_Status *p )
+{
+  printf( "\n=====Daq board status=====\n");
+  printf( "high level driver status: 0x%X\nPrimary status register: 0x%X\n\n", p->status, p->intstatus);
+  printf( "completed input transfers: %u\ninput FIFO overflows: %u\nlast completed input buffer: 0x%X\nsize in bytes, input buffer: %u\n\n", p->dma0counter, p->dma0overflow, (unsigned int)p->useraddr0, (unsigned int)p->usersize0 );
+  printf( "completed output transfers: %u\noutput FIFO overflows: %u\nlast completed output buffer: 0x%X\nsize in bytes, output buffer: %u\n\n", p->dma1counter, p->dma1overflow, (unsigned int)p->useraddr1, (unsigned int) p->usersize1 );
+  printf( "points to DaqBoard for this fd: 0x%X\n", (unsigned int)p->userdata );
+}
+//=========================================================
+
+float udelraw2float ( unsigned int x, float vfs)
+{ 
+  /*float t1;
+  gscRawtoFloat( &t1, &x, 1, vfs );
+  return t1;*/
+  return (( (int)( ( x  ) & 0x0000ffff) - 32768.0)) / 32768.0 * vfs ;  
+}

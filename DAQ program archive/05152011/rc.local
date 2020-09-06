@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# This script will be executed *after* all the other init scripts.
+# You can put your own initialization stuff in here if you don't
+# want to do the full Sys V style init stuff.
+
+touch /var/lock/subsys/local
+
+if [ -x /data/startwireless.sh ] ; then
+	/data/startwireless.sh
+fi
+
+if [ -x /data/datastart.sh ] ; then
+	/data/datastart.sh
+fi
+
+logfile=/data/udel_daq.log
+echo "    " >> $logfile
+echo "-------DAQ start-------"  >> $logfile
+date >> $logfile
+service ntpd stop >> $logfile
+#echo "adjtimex setup" >> $logfile
+#/sbin/adjtimex -t 10001 -f 20788002 
+#/sbin/adjtimex -p >> $logfile
+#/data/udel_daqstart.sh

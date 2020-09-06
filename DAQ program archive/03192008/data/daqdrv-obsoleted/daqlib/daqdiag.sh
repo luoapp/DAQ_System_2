@@ -1,0 +1,1 @@
+/data/daqdrv/daqlib/daqcmd init "output samplerate=1000.e3 vfs=5. channels=0 clock=internal" "input samplerate=1000.e3 channels=8 nrows=1000" "input vfs=10. mode=zero clock=internal" "trigger=software" "readdma trigger"

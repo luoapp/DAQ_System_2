@@ -1,0 +1,1 @@
+cmd_/data/daqdrv/daqdriver/daqdrv.o := ld -m elf_i386 -m elf_i386  -r -o /data/daqdrv/daqdriver/daqdrv.o /data/daqdrv/daqdriver/daqdrvmain.o /data/daqdrv/daqdriver/gsc16aiss8ao4.o /data/daqdrv/daqdriver/gsc16aiss16ao2.o

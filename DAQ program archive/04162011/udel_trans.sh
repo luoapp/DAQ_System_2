@@ -1,0 +1,7 @@
+# chirp1.daq : 45sec, 128 chirps
+# mseq.daq : 8on-8off (x3)
+date
+/data/daqdrv64/samples/udel_readwrite /data/transmission/chirp1amp10.daq o.sr=80000 x.hd=0 x.disp=0 o.nchans=4 i.length=10 
+#/data/daqdrv64/samples/udel_readwrite /data/transmission/mseq1amp10.daq o.sr=80000 x.hd=0 x.disp=0   
+date
+
